@@ -1,16 +1,19 @@
-
 from fastapi import FastAPI
+from app.core.rabbitmq import publish_message
 
 app = FastAPI()
 
+
 @app.get("/")
 def home():
-    return {
-        "status": "online"
-    }
+    return {"status": "online"}
 
-@app.get("/health")
-def health():
+
+@app.post("/webhook")
+def webhook(payload: dict):
+
+    publish_message(payload)
+
     return {
-        "status": "healthy"
+        "status": "success"
     }
