@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from core.rabbitmq import publish_message
+from app.core.rabbitmq import publish_message
 
 app = FastAPI()
 
