@@ -1,4 +1,5 @@
 import json
+import time
 import pika
 
 
@@ -13,13 +14,28 @@ def callback(ch, method, properties, body):
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
-conexao = pika.BlockingConnection(
-    pika.ConnectionParameters("rabbitmq")
-)
+while True:
+    try:
+        print("Tentando conectar ao RabbitMQ...")
+
+        conexao = pika.BlockingConnection(
+            pika.ConnectionParameters("rabbitmq")
+        )
+
+        print("Conectado ao RabbitMQ.")
+        break
+
+    except Exception as e:
+        print(f"Erro: {e}")
+        time.sleep(5)
+
 
 canal = conexao.channel()
 
-canal.queue_declare(queue="webhook_queue")
+canal.queue_declare(
+    queue="webhook_queue",
+    durable=True
+)
 
 canal.basic_consume(
     queue="webhook_queue",
