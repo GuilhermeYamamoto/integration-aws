@@ -19,6 +19,13 @@ services:
     depends_on:
       - rabbitmq
 
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
   rabbitmq:
 
     image: rabbitmq:3.13-management
@@ -48,3 +55,10 @@ services:
     command: python app/worker.py
 
     restart: always
+
+    healthcheck:
+      test: ["CMD", "nc", "-z", "rabbitmq", "5672"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
