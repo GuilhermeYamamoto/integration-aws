@@ -30,3 +30,21 @@ services:
       - "15672:15672"
 
     restart: always
+
+  worker:
+
+    build:
+      context: .
+      dockerfile: docker/fastapi/Dockerfile
+
+    container_name: worker
+
+    volumes:
+      - .:/app
+
+    depends_on:
+      - rabbitmq
+
+    command: python app/worker.py
+
+    restart: always
