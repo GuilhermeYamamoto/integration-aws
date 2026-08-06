@@ -5,7 +5,7 @@ import pika
 import signal
 import sys
 
-from app.core.rabbitmq_setup import setup_queue_with_dlq
+from core.rabbitmq_setup import setup_queue_with_dlq
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
