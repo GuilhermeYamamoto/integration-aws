@@ -2,7 +2,7 @@ import json
 import pika
 
 RABBITMQ_HOST = "rabbitmq"
-QUEUE_NAME = "bitrix_events"
+QUEUE_NAME = "webhook_queue"
 
 
 def publish_message(message):
