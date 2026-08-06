@@ -6,10 +6,10 @@ import pika
 def callback(ch, method, properties, body):
     mensagem = json.loads(body)
 
-    print("=" * 50)
-    print("Mensagem recebida:")
-    print(mensagem)
-    print("=" * 50)
+    print("=" * 50, flush=True)
+    print("Mensagem recebida:", flush=True)
+    print(mensagem, flush=True)
+    print("=" * 50, flush=True)
 
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
