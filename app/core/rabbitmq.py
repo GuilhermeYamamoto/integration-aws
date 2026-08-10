@@ -41,9 +41,9 @@ class RabbitMQPool:
             parameters = pika.ConnectionParameters(
                 host="rabbitmq",
                 credentials=credentials,
-                socket_timeout=5,
-                connection_attempts=3,
-                retry_delay=2,
+                socket_timeout=10,
+                connection_attempts=5,
+                retry_delay=3,
             )
             logger.info("   Conectando para rabbitmq:5672...")
             self._connection = pika.BlockingConnection(parameters)
