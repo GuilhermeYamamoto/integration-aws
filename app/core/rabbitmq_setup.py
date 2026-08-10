@@ -12,6 +12,7 @@ WEBHOOK_DLQ = "webhook_dlq"  # Dead Letter Queue
 
 def setup_queue_with_dlq(channel: pika.channel.Channel):
     """Cria fila com Dead Letter Queue."""
+    logger.info("🔄 Iniciando configuração de filas e Dead Letter Queue...")
     
     # 1. Criar Dead Letter Exchange
     channel.exchange_declare(
@@ -19,14 +20,14 @@ def setup_queue_with_dlq(channel: pika.channel.Channel):
         exchange_type='direct',
         durable=True
     )
-    logger.info(f"Exchange '{WEBHOOK_DLX}' criado")
+    logger.info(f"  ✓ Exchange '{WEBHOOK_DLX}' criado/verificado")
     
     # 2. Criar Dead Letter Queue
     channel.queue_declare(
         queue=WEBHOOK_DLQ,
         durable=True
     )
-    logger.info(f"Fila DLQ '{WEBHOOK_DLQ}' criada")
+    logger.info(f"  ✓ Fila DLQ '{WEBHOOK_DLQ}' criada/verificada")
     
     # 3. Conectar DLQ ao DLX
     channel.queue_bind(
@@ -34,7 +35,7 @@ def setup_queue_with_dlq(channel: pika.channel.Channel):
         queue=WEBHOOK_DLQ,
         routing_key=WEBHOOK_QUEUE  # Quando mensagem for rejeitada, vai aqui
     )
-    logger.info(f"DLQ bound ao DLX com routing_key '{WEBHOOK_QUEUE}'")
+    logger.info(f"  ✓ DLQ bound ao DLX com routing_key '{WEBHOOK_QUEUE}'")
     
     # 4. Criar fila normal COM referência ao DLX
     channel.queue_declare(
@@ -45,7 +46,8 @@ def setup_queue_with_dlq(channel: pika.channel.Channel):
             'x-dead-letter-routing-key': WEBHOOK_QUEUE
         }
     )
-    logger.info(f"Fila '{WEBHOOK_QUEUE}' criada com DLX configurado")
+    logger.info(f"  ✓ Fila principal '{WEBHOOK_QUEUE}' criada/verificada com DLX")
+    logger.info("✅ Todas as filas configuradas com sucesso!")
 
 
 def consume_from_dlq(channel: pika.channel.Channel, callback):

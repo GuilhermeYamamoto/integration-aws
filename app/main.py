@@ -3,8 +3,14 @@ from app.core.rabbitmq import publish_message, RabbitMQPool
 from app.core.rabbitmq_setup import setup_queue_with_dlq
 from pydantic import BaseModel, Field
 import logging
+import sys
 
-logging.basicConfig(level=logging.INFO)
+# Logging direto para stdout (para docker logs capturar)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
@@ -13,14 +19,34 @@ app = FastAPI()
 @app.on_event("startup")
 def startup_event():
     """Configura filas do RabbitMQ na inicialização."""
+    logger.info("=" * 60)
+    logger.info("🔧 INICIANDO CONFIGURAÇÃO DE FILAS DO RABBITMQ")
+    logger.info("=" * 60)
+    
     try:
+        logger.info("1️⃣  Obtendo pool de conexão...")
         pool = RabbitMQPool()
+        
+        logger.info("2️⃣  Conectando ao RabbitMQ...")
         connection = pool.get_connection()
+        logger.info("✓ Conexão estabelecida")
+        
+        logger.info("3️⃣  Criando canal...")
         channel = connection.channel()
+        logger.info("✓ Canal criado")
+        
+        logger.info("4️⃣  Configurando fila com DLQ...")
         setup_queue_with_dlq(channel)
-        logger.info("✓ Filas RabbitMQ configuradas no startup")
+        logger.info("✓ Fila configurada")
+        
+        logger.info("=" * 60)
+        logger.info("✅ FILAS CONFIGURADAS COM SUCESSO!")
+        logger.info("=" * 60)
     except Exception as e:
-        logger.error(f"✗ Erro ao configurar filas: {e}", exc_info=True)
+        logger.error("=" * 60)
+        logger.error("❌ ERRO AO CONFIGURAR FILAS!")
+        logger.error("=" * 60)
+        logger.error(f"Erro: {e}", exc_info=True)
 
 class WebhookPayload(BaseModel):
     """ Define o contrado de dados esperado. """

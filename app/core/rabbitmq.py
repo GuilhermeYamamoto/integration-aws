@@ -31,10 +31,11 @@ class RabbitMQPool:
         """Retorna conexão existente ou cria nova."""
         # Se conexão está aberta, reutiliza
         if self._is_connection_open():
+            logger.debug("♻️  Reutilizando conexão existente")
             return self._connection
         
         # Caso contrário, cria nova
-        logger.info("Criando nova conexão com RabbitMQ...")
+        logger.info("🔗 Criando nova conexão com RabbitMQ...")
         try:
             credentials = pika.PlainCredentials("guest", "guest")
             parameters = pika.ConnectionParameters(
@@ -44,11 +45,13 @@ class RabbitMQPool:
                 connection_attempts=3,
                 retry_delay=2,
             )
+            logger.info("   Conectando para rabbitmq:5672...")
             self._connection = pika.BlockingConnection(parameters)
-            logger.info("✓ Conexão estabelecida com RabbitMQ")
+            logger.info("   ✓ Conexão TCP estabelecida")
+            logger.info("✅ Conexão RabbitMQ ativa e pronta")
             return self._connection
         except Exception as e:
-            logger.error(f"✗ Falha ao conectar: {e}")
+            logger.error(f"❌ Falha ao conectar ao RabbitMQ: {type(e).__name__}: {e}")
             raise
     
     def reset_connection(self):
@@ -72,13 +75,16 @@ class RabbitMQPool:
 
 def publish_message(message, max_retries=3):
     """Publica mensagem com retry automático."""
+    logger.info(f"📤 Publicando mensagem: {message}")
     pool = RabbitMQPool()
     
     for attempt in range(1, max_retries + 1):
         try:
+            logger.info(f"Tentativa {attempt}/{max_retries}...")
             connection = pool.get_connection()
             channel = connection.channel()
             
+            logger.info("Enviando para fila 'webhook_queue'...")
             channel.basic_publish(
                 exchange="",
                 routing_key="webhook_queue",
@@ -87,18 +93,23 @@ def publish_message(message, max_retries=3):
                     delivery_mode=2,  # Mensagem persistente
                 )
             )
-            logger.info(f"✓ Mensagem publicada: {message}")
+            logger.info(f"✅ Mensagem publicada com sucesso!")
             return
             
+        except pika.exceptions.ChannelClosedByBroker as e:
+            logger.error(f"❌ Canal fechado pela broker: {e}")
+            pool.reset_connection()
+            if attempt == max_retries:
+                raise
         except (pika.exceptions.AMQPConnectionError, 
                 pika.exceptions.AMQPChannelError,
+                pika.exceptions.StreamLostError,
                 ConnectionResetError) as e:
-            logger.warning(f"Tentativa {attempt}/{max_retries} falhou: {e}")
+            logger.warning(f"⚠️  Tentativa {attempt}/{max_retries} falhou: {type(e).__name__}: {e}")
             pool.reset_connection()
-            
             if attempt == max_retries:
-                logger.error("Falha ao publicar após todas as tentativas")
+                logger.error(f"❌ Falha ao publicar após {max_retries} tentativas")
                 raise
         except Exception as e:
-            logger.error(f"Erro inesperado: {e}")
+            logger.error(f"❌ Erro inesperado: {type(e).__name__}: {e}", exc_info=True)
             raise
