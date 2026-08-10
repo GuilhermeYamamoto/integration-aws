@@ -1,8 +1,18 @@
 from fastapi import FastAPI
-from app.core.rabbitmq import publish_message
+from app.core.rabbitmq import publish_message, RabbitMQPool
+from app.core.rabbitmq_setup import setup_queue_with_dlq
 from pydantic import BaseModel, Field
 
 app = FastAPI()
+
+# Inicializar filas ao startup
+@app.on_event("startup")
+def startup_event():
+    """Configura filas do RabbitMQ na inicialização."""
+    pool = RabbitMQPool()
+    connection = pool.get_connection()
+    channel = connection.channel()
+    setup_queue_with_dlq(channel)
 
 class WebhookPayload(BaseModel):
     """ Define o contrado de dados esperado. """

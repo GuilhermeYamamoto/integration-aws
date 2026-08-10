@@ -46,7 +46,7 @@ def publish_message(message):
     connection = pool.get_connection()  # Reutiliza!
     channel = connection.channel()
     
-    channel.queue_declare(queue="webhook_queue", durable=True)
+    # Queue já foi declarada no startup, apenas publica
     channel.basic_publish(
         exchange="",
         routing_key="webhook_queue",
