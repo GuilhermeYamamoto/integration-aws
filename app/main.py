@@ -2,6 +2,10 @@ from fastapi import FastAPI
 from app.core.rabbitmq import publish_message, RabbitMQPool
 from app.core.rabbitmq_setup import setup_queue_with_dlq
 from pydantic import BaseModel, Field
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -9,10 +13,14 @@ app = FastAPI()
 @app.on_event("startup")
 def startup_event():
     """Configura filas do RabbitMQ na inicialização."""
-    pool = RabbitMQPool()
-    connection = pool.get_connection()
-    channel = connection.channel()
-    setup_queue_with_dlq(channel)
+    try:
+        pool = RabbitMQPool()
+        connection = pool.get_connection()
+        channel = connection.channel()
+        setup_queue_with_dlq(channel)
+        logger.info("✓ Filas RabbitMQ configuradas no startup")
+    except Exception as e:
+        logger.error(f"✗ Erro ao configurar filas: {e}", exc_info=True)
 
 class WebhookPayload(BaseModel):
     """ Define o contrado de dados esperado. """
