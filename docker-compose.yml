@@ -14,6 +14,12 @@ services:
     volumes:
       - .:/app
 
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+
     restart: always
 
     depends_on:
@@ -21,7 +27,8 @@ services:
         condition: service_healthy
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # A imagem slim não tem curl; usamos o próprio Python (falha se /health devolver erro)
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=4)"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -37,8 +44,12 @@ services:
       - "5672:5672"
       - "15672:15672"
 
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+
     restart: always
-    
+
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -57,16 +68,24 @@ services:
     volumes:
       - .:/app
 
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+
     depends_on:
       rabbitmq:
         condition: service_healthy
 
-    command: python app/worker.py
+    # -m roda como módulo, para os imports `app.core...` funcionarem igual à API
+    command: python -m app.worker
 
     restart: always
 
     healthcheck:
-      test: ["CMD", "nc", "-z", "rabbitmq", "5672"]
+      # A imagem slim não tem nc; checa se a porta do RabbitMQ responde usando Python
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('rabbitmq', 5672), timeout=4)"]
       interval: 10s
       timeout: 5s
       retries: 3
