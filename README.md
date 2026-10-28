@@ -56,6 +56,20 @@ docker compose up --build
 - API e docs interativas: http://localhost:8000/docs
 - Painel do RabbitMQ: http://localhost:15672 (usuário/senha do `.env`)
 
+## No servidor (produção)
+
+Preencha também `DOMAIN` e troque `RABBITMQ_PASSWORD` no `.env`, e suba com o perfil `prod`,
+que inclui o Caddy (HTTPS automático na frente do FastAPI):
+
+```bash
+docker compose --profile prod up -d --build
+```
+
+- Públicos (via HTTPS): só `/api/bitrix/*` e `/health`. O resto responde 404.
+- FastAPI (8000) e RabbitMQ (5672/15672) ficam presos ao `127.0.0.1` do servidor. Para ver o
+  painel, use um túnel SSH: `ssh -L 15672:localhost:15672 usuario@servidor` e abra
+  http://localhost:15672 no seu computador.
+
 ## Comportamento de erros no repasse ao Odoo
 
 | Resposta do Odoo | O que acontece |

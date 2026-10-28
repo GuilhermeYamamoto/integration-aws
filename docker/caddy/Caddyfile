@@ -1,0 +1,11 @@
+# Caddy obtém e renova o certificado HTTPS do domínio automaticamente
+{$DOMAIN} {
+	# Só o webhook do Bitrix e o health ficam públicos; /docs e /webhook não
+	@publico path /api/bitrix/* /health
+	handle @publico {
+		reverse_proxy fastapi:8000
+	}
+	handle {
+		respond 404
+	}
+}
