@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from datetime import datetime, timezone
+from fastapi import FastAPI, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from app.core.rabbitmq import publish_message, RabbitMQPool
 from app.core.rabbitmq_setup import setup_queue_with_dlq
@@ -116,6 +118,40 @@ def webhook(payload: WebhookPayload):  # FastAPI valida automaticamente
 
     publish_message(payload.model_dump())
     return {"status": "success"}
+
+
+@app.post("/api/bitrix/post_crm_bitrix")
+async def bitrix_webhook(request: Request):
+    """
+    Recebe o webhook de saída do Bitrix e coloca na fila, SEM alterar nada.
+
+    O caminho é o mesmo da URL do Odoo de propósito: para trocar entre o
+    FastAPI e o Odoo (plano B), basta mudar o domínio no Bitrix.
+    O worker repassa o corpo original, byte a byte, para o Odoo.
+    """
+    body = await request.body()
+    try:
+        body_text = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return JSONResponse({"status": "error", "detail": "corpo não é texto UTF-8"}, status_code=400)
+
+    message = {
+        "source": "bitrix",
+        "received_at": datetime.now(timezone.utc).isoformat(),
+        "content_type": request.headers.get("content-type", ""),
+        "query_string": request.url.query,
+        "body": body_text,
+    }
+
+    try:
+        # publish_message é bloqueante; rodar numa thread evita travar o servidor async
+        await run_in_threadpool(publish_message, message)
+    except Exception:
+        logger.exception("Falha ao enfileirar webhook do Bitrix")
+        # Erro devolvido ao Bitrix: sinal de que é hora do plano B
+        return JSONResponse({"status": "error", "detail": "fila indisponível"}, status_code=503)
+
+    return {"status": "queued"}
 
 @app.get("/health")
 def health():

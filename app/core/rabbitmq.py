@@ -86,7 +86,8 @@ class RabbitMQPool:
 
 def publish_message(message, max_retries=3):
     """Publica mensagem com retry automático."""
-    logger.info(f"📤 Publicando mensagem: {message}")
+    # Não loga o conteúdo: o corpo do Bitrix traz o token de autenticação
+    logger.info(f"📤 Publicando mensagem (origem: {message.get('source', 'webhook')})")
     pool = RabbitMQPool()
     
     for attempt in range(1, max_retries + 1):
