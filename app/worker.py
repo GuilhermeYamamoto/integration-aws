@@ -5,8 +5,11 @@ import pika
 import signal
 import sys
 
+from urllib.parse import parse_qs
+
 from app.core import config
-from app.core.rabbitmq_setup import setup_queue_with_dlq, WEBHOOK_QUEUE
+from app.core.odoo import forward_to_odoo, TemporaryError, PermanentError
+from app.core.rabbitmq_setup import setup_queue_with_dlq, WEBHOOK_QUEUE, WEBHOOK_RETRY_QUEUE
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,10 +49,48 @@ def connect_with_retry(max_retries=10, initial_delay=2):
             delay = min(delay * 2, 60)  # Máximo 60s, dobrando a cada tentativa
 
 
+def process_bitrix(ch, method, properties, body, mensagem):
+    """Repassa o webhook do Bitrix para o Odoo, com retry se o Odoo estiver fora."""
+    tentativas = (properties.headers or {}).get("x-retry-count", 0)
+    evento = parse_qs(mensagem["body"]).get("event", ["?"])[0]
+    logger.info(f"Bitrix → Odoo: evento {evento} (tentativa {tentativas + 1})")
+
+    try:
+        status = forward_to_odoo(mensagem)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+        logger.info(f"✓ Entregue ao Odoo (HTTP {status})")
+
+    except TemporaryError as e:
+        if tentativas < config.ODOO_MAX_RETRIES:
+            # Manda uma cópia para a fila de retry; depois do TTL ela volta para a fila principal
+            ch.basic_publish(
+                exchange="",
+                routing_key=WEBHOOK_RETRY_QUEUE,
+                body=body,
+                properties=pika.BasicProperties(
+                    delivery_mode=2,
+                    headers={"x-retry-count": tentativas + 1},
+                ),
+            )
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            logger.warning(f"⏳ Odoo indisponível ({e}). Nova tentativa agendada.")
+        else:
+            logger.error(f"✗ Odoo indisponível após {tentativas + 1} tentativas ({e}). Enviando para a DLQ.")
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
+    except PermanentError as e:
+        logger.error(f"✗ Odoo recusou a mensagem ({e}). Enviando para a DLQ.")
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
+
 def callback(ch, method, properties, body):
     """Processa mensagem COM tratamento de erro."""
     try:
         mensagem = json.loads(body)
+
+        if mensagem.get("source") == "bitrix":
+            process_bitrix(ch, method, properties, body, mensagem)
+            return
 
         logger.info(f"Processando: {mensagem}")
         # TODO: Adicionar lógica de processamento

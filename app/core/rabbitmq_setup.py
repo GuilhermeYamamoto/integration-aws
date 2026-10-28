@@ -9,6 +9,8 @@ logger = logging.getLogger(__name__)
 WEBHOOK_QUEUE = "webhook_queue"
 WEBHOOK_DLX = "webhook_dlx"  # Dead Letter Exchange
 WEBHOOK_DLQ = "webhook_dlq"  # Dead Letter Queue
+WEBHOOK_RETRY_QUEUE = "webhook_retry"  # Sala de espera antes de tentar de novo
+RETRY_DELAY_MS = 30_000  # Tempo que a mensagem espera na fila de retry
 
 def setup_queue_with_dlq(channel: pika.channel.Channel):
     """Cria fila com Dead Letter Queue."""
@@ -47,6 +49,19 @@ def setup_queue_with_dlq(channel: pika.channel.Channel):
         }
     )
     logger.info(f"  ✓ Fila principal '{WEBHOOK_QUEUE}' criada/verificada com DLX")
+
+    # 5. Criar fila de retry: ninguém consome dela. Quando o TTL expira, a
+    #    mensagem "morre" e o RabbitMQ a devolve para a fila principal.
+    channel.queue_declare(
+        queue=WEBHOOK_RETRY_QUEUE,
+        durable=True,
+        arguments={
+            'x-message-ttl': RETRY_DELAY_MS,
+            'x-dead-letter-exchange': '',  # Exchange padrão: entrega pelo nome da fila
+            'x-dead-letter-routing-key': WEBHOOK_QUEUE
+        }
+    )
+    logger.info(f"  ✓ Fila de retry '{WEBHOOK_RETRY_QUEUE}' criada/verificada ({RETRY_DELAY_MS // 1000}s)")
     logger.info("✅ Todas as filas configuradas com sucesso!")
 
 
