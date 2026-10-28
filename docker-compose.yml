@@ -9,7 +9,8 @@ services:
     container_name: fastapi
 
     ports:
-      - "8000:8000"
+      # Só acessível pela própria máquina; de fora, o acesso é pelo Caddy (HTTPS)
+      - "127.0.0.1:8000:8000"
 
     volumes:
       - .:/app
@@ -40,9 +41,17 @@ services:
 
     container_name: rabbitmq
 
+    # Nome fixo: o RabbitMQ guarda os dados numa pasta com o nome do host
+    hostname: rabbitmq
+
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      # 127.0.0.1 = não expor para a internet (o Docker ignora o firewall ufw)
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+
+    volumes:
+      # Volume nomeado: filas e mensagens sobrevivem a `docker compose down`
+      - rabbitmq_data:/var/lib/rabbitmq
 
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
@@ -93,3 +102,33 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+
+  caddy:
+
+    # Só sobe com `--profile prod`: no servidor, recebe HTTPS e repassa ao FastAPI
+    profiles: ["prod"]
+
+    image: caddy:2
+
+    container_name: caddy
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificados HTTPS ficam aqui (evita pedir de novo a cada restart)
+      - caddy_data:/data
+
+    restart: always
+
+    depends_on:
+      - fastapi
+
+volumes:
+  rabbitmq_data:
+  caddy_data:
